@@ -3,7 +3,11 @@ import seaborn as sns
 
 import matplotlib.pyplot as plt
 
-def visualize_bit_depth_results(evaluation_results):
+from pathlib import Path
+import datetime
+import json
+
+def visualize_bit_depth_results(evaluation_results, outdir: Path):
     """
     Create visualization plots for bit depth evaluation results.
     
@@ -11,7 +15,12 @@ def visualize_bit_depth_results(evaluation_results):
         evaluation_results (list): List of dictionaries containing evaluation metrics
     """
     # Convert list of dictionaries to DataFrame
-    df = pd.DataFrame(evaluation_results)
+    df = pd.DataFrame(evaluation_results).set_index('bit_depth')
+
+    outdir = outdir / datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    outdir.mkdir(exist_ok=True, parents=True)
+
+    df.to_csv(outdir / 'results.csv')
     
     # Set style for better visibility
     sns.set_style("whitegrid")
@@ -37,5 +46,14 @@ def visualize_bit_depth_results(evaluation_results):
         
         # Adjust layout to prevent label cutoff
         plt.tight_layout()
+
+        plt.savefig(outdir / f"{metric}.png")
     
-    plt.show()
+    # plt.show()
+
+def write_train_history(history, outdir: Path):
+    outfile = outdir / datetime.datetime.now().strftime('%Y%m%d_%H%M%S.json')
+    outfile.parent.mkdir(exist_ok=True, parents=True)
+
+    with outfile.open('w') as file:
+        json.dump(history, file)

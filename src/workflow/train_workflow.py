@@ -11,10 +11,13 @@ from rich.live import Live
 from rich.table import Table
 
 import utils
+from utils import torch_device
 
 
 
 def train_network(network: nn.Module, loss: nn.Module, optimizer: torch.optim.Optimizer, train_loader: DataLoader, val_loader: DataLoader, epochs=4):
+    network = network.to(torch_device)
+
     train_history = defaultdict(dict)
     global_progress = Progress(
         *Progress.get_default_columns(),
@@ -37,21 +40,25 @@ def train_network(network: nn.Module, loss: nn.Module, optimizer: torch.optim.Op
             val_loss_task = local_progress.add_task('Compute val loss', total=len(val_loader), sample_loss=0)
             acc_sum = 0
             for x, y in val_loader:
+                x, y = x.to(torch_device), y.to(torch_device)
+
                 subj_loss = loss(network(x).detach(), y).detach()
                 acc_sum += subj_loss
                 local_progress.update(val_loss_task, advance=1, sample_loss=subj_loss)
 
-            train_history[f'Epoch {epoch}']['val_loss'] = acc_sum / len(val_loader)
+            train_history[f'Epoch {epoch}']['val_loss'] = int((acc_sum / len(val_loader)).cpu().numpy())
             local_progress.update(val_loss_task, visible=False)
             global_progress.update(training_task, val_loss=acc_sum / len(val_loader))
 
-            utils.log_info(f'Finished epoch [{epoch} / {epochs}] with val loss {acc_sum / len(val_loader)}')
+            # utils.log_info(f'Finished epoch [{epoch} / {epochs}] with val loss {acc_sum / len(val_loader)}')
             
         update_val_loss(-1)
 
         for epoch in range(epochs):
             epoch_task = local_progress.add_task(f"Epoch [{epoch} / {epochs}]", total=len(train_loader), sample_loss=0)
             for x, y in train_loader:
+                x, y = x.to(torch_device), y.to(torch_device)
+
                 optimizer.zero_grad()
                 subj_loss = loss(network(x), y)
                 subj_loss.backward()

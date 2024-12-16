@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import utils
 
 def create_dataloaders(dataset: Dataset, batch_size=32, train_split=0.8, val_split=0.1,
                        pin_memory=True, seed=42):
@@ -31,31 +32,25 @@ def create_dataloaders(dataset: Dataset, batch_size=32, train_split=0.8, val_spl
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
         dataset, 
         [train_size, val_size, test_size],
-        generator=torch.Generator().manual_seed(seed)
+        generator=torch.Generator(device=utils.torch_device).manual_seed(seed)
     )
     
     # Create DataLoaders
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
-        pin_memory=pin_memory,
         worker_init_fn=lambda worker_id: np.random.seed(seed + worker_id)
     )
     
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
-        shuffle=False,
-        pin_memory=pin_memory,
         worker_init_fn=lambda worker_id: np.random.seed(seed + worker_id)
     )
     
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
-        shuffle=False,
-        pin_memory=pin_memory,
         worker_init_fn=lambda worker_id: np.random.seed(seed + worker_id)
     )
     

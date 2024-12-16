@@ -3,6 +3,8 @@ from torch.utils.data import Dataset
 import numpy as np
 
 from workflow import data_workflow
+from utils import torch_device
+
 
 class SimpleDenseDataset(Dataset):
     def __init__(self):
@@ -11,13 +13,13 @@ class SimpleDenseDataset(Dataset):
         np.random.seed(42)
         
         # Generate random input vectors (24000, 256)
-        self.inputs = torch.randn(48000, 256)
+        self.inputs = torch.randn(48000, 256).to(torch_device)
         
         # Create a fixed random linear transformation (256, 256)
-        self.transform_matrix = torch.randn(256, 256)
+        self.transform_matrix = torch.randn(256, 256).to(torch_device)
         
         # Compute outputs using the linear transformation
-        self.outputs = torch.matmul(self.inputs, self.transform_matrix)
+        self.outputs = torch.matmul(self.inputs, self.transform_matrix).to(torch_device)
         
     def __len__(self):
         return len(self.inputs)

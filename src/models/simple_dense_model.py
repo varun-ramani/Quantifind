@@ -1,6 +1,7 @@
 from torch import nn
 import torch.nn.functional as F
 import torch
+import utils
 
 from pathlib import Path
 
@@ -13,8 +14,8 @@ class SimpleDenseModel(nn.Module):
         return F.relu(self.layer(x))
 
 def create_model_context():
-    net = SimpleDenseModel()
-    crit = nn.MSELoss()
+    net = SimpleDenseModel().to(utils.torch_device)
+    crit = nn.MSELoss().to(utils.torch_device)
     optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 
     return net, crit, optimizer

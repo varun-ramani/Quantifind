@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import math
+import utils
 
 
 class PositionalEmbeddings(nn.Module):
@@ -33,7 +34,7 @@ class LanguageTransformerModel(nn.Module):
         self.embeddings = nn.Embedding(65535, d_model)
         self.positional_embeddings = PositionalEmbeddings(d_model, max_name_length)
         self.transformer_encoder = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model, 8), 8
+            nn.TransformerEncoderLayer(d_model, 4), 32
         )
         self.projection = nn.Linear(512, 18)
 
@@ -48,8 +49,8 @@ class LanguageTransformerModel(nn.Module):
 
 
 def create_model_context():
-    net = LanguageTransformerModel()
-    crit = nn.CrossEntropyLoss()
+    net = LanguageTransformerModel().to(utils.torch_device)
+    crit = nn.CrossEntropyLoss().to(utils.torch_device)
     optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 
     return net, crit, optimizer

@@ -1,6 +1,7 @@
 from torch import nn
 import torch.nn.functional as F
 import torch
+import utils
 
 class ConvMNISTModel(nn.Module):
     def __init__(self):
@@ -36,8 +37,8 @@ class ConvMNISTModel(nn.Module):
         return x
 
 def create_model_context():
-    net = ConvMNISTModel()
-    crit = nn.CrossEntropyLoss()
+    net = ConvMNISTModel().to(utils.torch_device)
+    crit = nn.CrossEntropyLoss().to(utils.torch_device)
     optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
     
     return net, crit, optimizer

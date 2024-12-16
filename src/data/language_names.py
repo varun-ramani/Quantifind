@@ -3,6 +3,7 @@ import random
 
 from torch.utils.data import Dataset
 import torch
+from utils import torch_device
 
 from workflow import data_workflow
 
@@ -30,7 +31,7 @@ class LanguageNamesDataset(Dataset):
                 (name.ljust(max_len, "\0"), lang) for name, lang in self.all_names
             ]
             self.all_names = [
-                (torch.IntTensor([ord(c) for c in name]), lang)
+                (torch.IntTensor([ord(c) for c in name]).to(torch_device), lang)
                 for name, lang in self.all_names
             ]
 

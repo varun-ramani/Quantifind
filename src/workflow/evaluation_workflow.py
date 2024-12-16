@@ -41,6 +41,7 @@ def compute_test_loss(
 
         with torch.no_grad():
             for x, y in test_loader:
+                x, y = x.to(utils.torch_device), y.to(utils.torch_device)
                 outputs = model(x)
                 batch_loss = loss_fn(outputs, y)
                 total_loss += batch_loss.item()
