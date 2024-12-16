@@ -4,6 +4,9 @@
 \usepackage{hyperref}
 \usepackage{graphicx}
 \usepackage{microtype}
+\usepackage[margin=0.7in]{geometry}
+\usepackage{amsmath}
+\usepackage{amsfonts}
 
 % Bibliography file
 \addbibresource{references.bib}
@@ -144,6 +147,208 @@ quantization approaches and implementations, the study in
 My study will attempt to answer both these questions, and in doing so, hopefully
 lay a foundation for implementing more efficient quantized hardware accelerators
 for neural networks.
+
+\section{Motivation}
+In this era of truly colossal neural networks, the computational demands of deep
+learning are swelling exponentially. To meet this need, a new generation of deep
+learning-optimized DSAs has appeared: consider AWS Trainium and (as previously
+mentioned) Google's focus on TPUs. Rather than focusing on general purpose
+parallel acceleration, as per NVIDIA's strategy with their GPUs, these
+accelerators solve the unique challenges encountered during deep learning.
+
+Quantization is a crucially important strategy to allow hardware to keep up with
+the ever-increasing computational demands of modern deep learning. Consider that
+modern language models can require hundreds of gigabytes just to store their
+weights in standard 32-bit floating-point precision. This growth in model size
+has created a pressing need for more efficient neural network implementations,
+particularly for deployment in resource-constrained environments. While various
+compression techniques exist, quantization is uniquely beneficial as it can
+optimize both computational efficiency and memory utilization without requiring
+architectural changes to the neural network itself.
+
+That said, there doesn't seem to be much understanding or literature about the
+effects of different quantization levels on different neural network
+architectures, making it difficult to deploy quantization-powered hardware
+accelerators with confidence.  Currently, many of the decisions underpinning
+DSAs for deep learning are based on conventional wisdom---such as the common
+choice of 8-bit integer arithmetic---rather than comprehensive empirical
+evidence. This is problematic because different neural architectures may have
+fundamentally different precision requirements. 
+
+Therfore, in this work, I will attempt to bridge this gap. By examining how
+different architectures respond to varying levels of quantization, I want to set
+the groundwork for quantized accelerators tailored to the unique needs of their
+particular target networks.
+
+\section{Methodology}
+In this section, I'll provide a detailed overview of the arbitrary-precision
+quantization framework and neural network architectures. The arbitrary precision
+framework is interesting because arbitrary precision quantization of floats is
+inherently not well defined; in this work, I attempt to define it and then
+implement it in code.
+
+\subsection{Quantization Framework}
+The quantization framework implements a discretization-based approach to
+simulate arbitrary-precision fixed-point arithmetic while operating within
+PyTorch's floating-point environment. For a target bit depth $b$, one bit is
+reserved for sign, leaving $b-1$ bits for magnitude representation. 
+
+This yields
+a discrete signed integer space with $2^{b-1}$ levels in each polarity, defined
+by:
+\begin{equation*}
+(level_{min}, level_{max}) = (-2^{b-1}, 2^{b-1} - 1)
+\end{equation*}
+
+For a given tensor $\mathbf{x}$, quantization begins by computing scaling
+parameters. Let $x_{min}$ and $x_{max}$ be the minimum and maximum values in
+$\mathbf{x}$. To ensure symmetric quantization around zero, these bounds are
+adjusted:
+\begin{equation*}
+x_{max}' = \max(|x_{max}|, |x_{min}|)
+\end{equation*}
+\begin{equation*}
+x_{min}' = -x_{max}'
+\end{equation*}
+The scaling factor $s$ is then computed to map this range to the discrete integer space:
+\begin{equation*}
+s = \frac{x_{max}' - x_{min}'}{level_{max} - level_{min}}
+\end{equation*}
+For signed quantization, the zero point offset is fixed at 0:
+\begin{equation*}
+z = 0
+\end{equation*}
+The quantization operation $Q(\mathbf{x})$ proceeds in three steps:
+
+Scale and offset the input values:
+\begin{equation*}
+\mathbf{x}_{scaled} = \frac{\mathbf{x}}{s} + z
+\end{equation*}
+Round to nearest integer:
+\begin{equation*}
+\mathbf{x}_{int} = round(\mathbf{x}_{scaled})
+\end{equation*}
+Clamp to valid range:
+\begin{equation*}
+\mathbf{x}_{clamped} = clamp(\mathbf{x}_{int}, level_{min}, level_{max})
+\end{equation*}
+
+The final quantized values are obtained by inverting the scaling:
+\begin{equation*}
+Q(\mathbf{x}) = ({\mathbf{x}_{clamped}} - z) \times s
+\end{equation*}
+This framework is applied consistently across three contexts:
+\begin{enumerate}
+    \item Model parameters: Each weight tensor and bias vector in the network is
+    independently quantized using its own scaling factors.
+    \item Activations: Intermediate tensor outputs are quantized using scaling
+    factors computed from their specific value ranges.
+    \item Input data: The framework provides a custom Dataset wrapper that
+    quantizes input tensors on-the-fly during data loading, maintaining batch
+    processing efficiency.
+\end{enumerate}
+The quantization scheme deliberately avoids true integer arithmetic, instead
+using floating-point operations to simulate fixed-point behavior. This design
+choice allows for exploration of arbitrary bit depths without requiring
+hardware-specific integer implementations, while still accurately modeling the
+effects of reduced precision through controlled value discretization.
+
+\subsection{Neural Network Suite}
+The study employs four distinct neural architectures to evaluate quantization
+effects across different network types and tasks. Each architecture is chosen to
+represent different aspects of modern neural network design.
+
+Each network is implemented in PyTorch and trained using the Adam optimizer with
+learning rate 0.001. The training process uses full 32-bit precision, with
+quantization applied only during evaluation.
+
+\subsubsection{Simple Dense Network}
+The simplest architecture consists of a single dense layer with ReLU activation:
+\begin{equation*}
+f(x) = \text{ReLU}(Wx + b), \quad W \in \mathbb{R}^{256 \times 256}, b \in \mathbb{R}^{256}
+\end{equation*}
+This network serves as a baseline to understand quantization effects on basic matrix multiplication and activation functions.
+
+\subsubsection{Dense MNIST Classifier}
+The dense MNIST classifier implements a three-layer architecture:
+\begin{align*}
+h_1 &= \text{ReLU}(W_1x + b_1), & W_1 &\in \mathbb{R}^{512 \times 784} \\
+h_2 &= \text{ReLU}(W_2h_1 + b_2), & W_2 &\in \mathbb{R}^{512 \times 512} \\
+y &= \text{softmax}(W_3h_2 + b_3), & W_3 &\in \mathbb{R}^{10 \times 512}
+\end{align*}
+
+\subsubsection{Convolutional MNIST Classifier}
+The convolutional architecture introduces spatial operations through three conv-pool blocks:
+\begin{align*}
+h_1 &= \text{Pool}(\text{ReLU}(\text{Conv}_1(x))), & \text{Conv}_1 &: 1 \rightarrow 32 \text{ channels} \\
+h_2 &= \text{Pool}(\text{ReLU}(\text{Conv}_2(h_1))), & \text{Conv}_2 &: 32 \rightarrow 64 \text{ channels} \\
+h_3 &= \text{Pool}(\text{ReLU}(\text{Conv}_3(h_2))), & \text{Conv}_3 &: 64 \rightarrow 128 \text{ channels} \\
+y &= \text{softmax}(Wh_3 + b), & W &\in \mathbb{R}^{10 \times (128 \times 3 \times 3)}
+\end{align*}
+where each Conv layer uses $3\times3$ kernels with padding=1, and Pool implements $2\times2$ max pooling.
+
+\subsubsection{Language Transformer}
+The transformer architecture processes character-level sequences for language
+identification. If a sequence $x$ has length $L$, then the architecture is
+computed as follows:
+\begin{align*}
+E_{char} &= \text{Embedding}(x), \quad E_{char} \in \mathbb{R}^{L \times 512}, \text{ vocab size } = 65535 \nonumber \\
+E &= E_{char} + \text{PositionalEmbedding}(L), \quad E \in \mathbb{R}^{L \times 512} \\
+H_0 &= E \\
+H_1 &= \text{TransformerLayer}_1(H_{0}) \\
+... \\
+H_{32} &= \text{TransformerLayer}_{32}(H_{31}) \\
+H_{mean} &= \text{mean}(H_{32}), \quad H_{mean} \in R^{512} \\
+y &= \text{softmax}(\text{Linear}(H_{mean})), \quad y \in \mathbb{R}^{18}
+\end{align*}
+
+Transformer layers are used directly from PyTorch with 4 self-attention heads.
+
+\section{Evaluation}
+This section details the evaluation methodology used to assess quantization effects across different bit depths and neural architectures.
+
+\subsection{Testing Framework}
+The evaluation framework systematically tests each neural network architecture across bit depths ranging from 2 to 32 bits. For a given network and bit depth $b$, the evaluation process consists of:
+\begin{enumerate}
+\item Quantizing the model parameters using the framework described in Section 3
+\item Processing the test dataset through both the original and quantized models
+\item Computing comparative metrics between the two versions
+\end{enumerate}
+
+\subsection{Evaluation Metrics}
+For each bit depth $b$, the framework computes four key metrics:
+\begin{align}
+\text{Original Loss} &= \mathcal{L}(f_{32}(\mathbf{x}), \mathbf{y}) \nonumber \\
+\text{Quantized Loss} &= \mathcal{L}(f_b(\mathbf{x}), \mathbf{y}) \nonumber \\
+\text{Signal-to-Complexity Ratio} &= \frac{\text{Quantized Loss}}{b} \nonumber \\
+\text{Criterion Ratio} &= \frac{\text{Quantized Loss}}{\text{Original Loss}}
+\end{align}
+where $f_{32}$ represents the original 32-bit model, $f_b$ represents the $b$-bit quantized model, $\mathbf{x}$ represents the input data, $\mathbf{y}$ represents the target values, and $\mathcal{L}$ represents the appropriate loss function (criterion) for each model:
+\begin{itemize}
+\item Mean Squared Error loss for the simple dense network
+\item Cross Entropy loss for both MNIST classifiers
+\item Cross Entropy loss for the language transformer
+\end{itemize}
+The Signal-to-Complexity Ratio (SCR) is a novel metric introduced in this study
+to assess the efficiency of different bit depths. It measures the trade-off
+between model performance (quantized loss) and representation complexity (bit
+depth). A lower SCR indicates more efficient use of the allocated bits,
+suggesting better performance relative to the precision used.
+
+The Criterion Ratio (CR) provides a direct measure of the relative change in the
+loss function (criterion) due to quantization, with values closer to 1.0
+indicating better preservation of model behavior. This metric enables direct
+comparison of how quantization affects the optimization criterion across
+different bit depths. By expressing quantized loss as a ratio of the original
+loss, it normalizes the metric across different model architectures and loss
+functions.
+
+These metrics were chosen to provide complementary views of quantization
+effects: while CR measures relative change in the optimization criterion, SCR
+provides insight into the efficiency of bit utilization.
+
+
+
 
 \printbibliography
 
