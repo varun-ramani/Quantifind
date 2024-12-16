@@ -31,7 +31,7 @@ def train_network(network: nn.Module, loss: nn.Module, optimizer: torch.optim.Op
     table.add_row(local_progress)
 
     with Live(table, console=utils.console) as live:
-        training_task = global_progress.add_task(f"Training...", total=epochs)
+        training_task = global_progress.add_task(f"Training...", total=epochs, val_loss=0)
 
         def update_val_loss(epoch):
             val_loss_task = local_progress.add_task('Compute val loss', total=len(val_loader), sample_loss=0)
@@ -70,7 +70,6 @@ def save_train_context(
     checkpoints_dir: str, 
     net: torch.nn.Module, 
     optimizer: torch.optim.Optimizer, 
-    loss: torch.nn.Module
 ):
     """
     Writes the current network, optimizer, and loss to a timestamped checkpoint.
@@ -81,15 +80,16 @@ def save_train_context(
     - loss: current loss
     """
     checkpoints_dir = Path(checkpoints_dir)
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    checkpoints_dir.mkdir(exist_ok=True, parents=True)
+
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     checkpoint_filename = f'checkpoint_{timestamp}.pth'
     checkpoint_path = checkpoints_dir / checkpoint_filename
     torch.save({
         'model_state_dict': net.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss,
     }, checkpoint_path)
-    utils.log_info(f"Saved '{checkpoint_path}' with loss {loss}")
+    utils.log_info(f"Saved to '{checkpoint_path}'")
 
 
 def load_train_context(
@@ -106,6 +106,9 @@ def load_train_context(
         optimizer: optimizer to load state into
     """
     checkpoints_dir = Path(checkpoints_dir)
+    if not checkpoints_dir.exists():
+        return None
+
     checkpoint_files = list(checkpoints_dir.glob('checkpoint_*.pth'))
     
     if not checkpoint_files:
