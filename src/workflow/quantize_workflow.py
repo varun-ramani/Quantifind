@@ -1,4 +1,8 @@
 import torch
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
+import copy
+
 
 class BitQuantizer:
     def __init__(self, num_bits=32):
@@ -40,3 +44,64 @@ class BitQuantizer:
         x_quant = (x_int - zero_point) * scale
         
         return x_quant, scale, zero_point
+    
+    def quantized_model(self, model: nn.Module) -> nn.Module:
+        """
+        Creates a quantized version of the supplied neural network by copying it
+        and then quantizing all the parameter sets in the copy.
+        """
+        # Create a deep copy of the model to avoid modifying the original
+        quantized_model = copy.deepcopy(model)
+        
+        # Quantize all parameters in the model, regardless of requires_grad
+        for name, param in quantized_model.named_parameters():
+            # Quantize the parameter
+            quantized_param, _, _ = self.quantize(param.data)
+            # Replace the parameter with its quantized version
+            param.data.copy_(quantized_param)
+        
+        return quantized_model
+
+    class QuantizedDataset(Dataset):
+        """Inner dataset class to handle quantization of individual samples"""
+        def __init__(self, original_dataset, quantizer):
+            self.dataset = original_dataset
+            self.quantizer = quantizer
+            
+        def __len__(self):
+            return len(self.dataset)
+            
+        def __getitem__(self, idx):
+            data, label = self.dataset[idx]
+            if isinstance(data, torch.Tensor):
+                quantized_data, _, _ = self.quantizer.quantize(data)
+                return quantized_data, label
+            else:
+                # Handle non-tensor data by converting to tensor first
+                data_tensor = torch.tensor(data)
+                quantized_data, _, _ = self.quantizer.quantize(data_tensor)
+                return quantized_data, label
+
+    def quantized_dataloader(self, dataloader: DataLoader) -> DataLoader:
+        """
+        Creates a quantized version of the supplied DataLoader by quantizing all
+        the inputs and leaving the labels alone. The new dataloader should
+        retain the same length as the old dataloader (i.e. it shouldn't just be
+        an iterator). However, it should not accomplish this by reading the
+        entire old dataloader into memory and quantizing it one element at a time.
+        """
+        # Create a quantized version of the dataset
+        quantized_dataset = self.QuantizedDataset(dataloader.dataset, self)
+        
+        # Create new dataloader with same parameters as original
+        return DataLoader(
+            dataset=quantized_dataset,
+            batch_size=dataloader.batch_size,
+            sampler=dataloader.sampler,
+            num_workers=dataloader.num_workers,
+            collate_fn=dataloader.collate_fn,
+            pin_memory=dataloader.pin_memory,
+            drop_last=dataloader.drop_last,
+            timeout=dataloader.timeout,
+            worker_init_fn=dataloader.worker_init_fn
+        )
