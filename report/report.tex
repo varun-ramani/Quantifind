@@ -1,0 +1,89 @@
+\documentclass[twocolumn]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[style=numeric]{biblatex}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{microtype}
+
+% Bibliography file
+\addbibresource{references.bib}
+
+\title{Your Paper Title}
+\author{Your Name}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Your abstract goes here.
+\end{abstract}
+
+\section{Introduction}
+As deep neural networks continue to dominate the landscape of machine learning
+applications, the design of domain-specific hardware accelerators has become
+increasingly critical for efficient deployment in deep learning situations.
+While these specialized architectures offer significant performance improvements
+over general-purpose processors, their design space is heavily influenced by
+fundamental assumptions about numerical precision and data representation. One
+such assumption -- the bit width used for neural network operations -- can
+dramatically impact both the hardware complexity and the achievable performance
+of these accelerators.
+
+Model quantization, the process of reducing numerical precision of network
+parameters and computations, represents a crucial bridge between neural network
+algorithms and their hardware implementations. While current domain-specific
+architectures often implement fixed bit widths (typically 8-bit integers or
+16-bit floating point numbers) based on conventional wisdom or hardware
+constraints, there has been limited systematic investigation into how different
+neural architectures respond to varying levels of quantization precision. This
+gap in understanding affects not only software optimization but also hardware
+design decisions, as the choice of supported bit widths directly impacts circuit
+complexity, memory requirements, and energy efficiency of neural network
+accelerators.
+
+The motivation for quantization stems from both practical and theoretical
+considerations in neural network deployment. From a hardware perspective,
+reduced precision operations offer substantial benefits: lower memory bandwidth
+requirements, decreased power consumption, and simpler arithmetic units that can
+be parallelized more effectively. For example, replacing 32-bit floating-point
+operations with 8-bit integer operations can theoretically yield a 4x reduction
+in memory footprint and bandwidth requirements. This efficiency gain is
+particularly crucial for edge devices and mobile applications where power and
+memory constraints are significant limiting factors. Additionally, many
+domain-specific neural network accelerators can achieve higher throughput with
+fixed-point or reduced-precision floating-point arithmetic, as these simpler
+operations allow for more processing units within the same silicon area and
+power envelope.
+
+Beyond hardware efficiency, quantization addresses a fundamental question about
+neural network representations: how much numerical precision is actually
+necessary for effective inference? Neural networks are known to be robust to
+various forms of noise and perturbation during training, suggesting they might
+not require the full precision of 32-bit floating-point numbers to maintain
+their functional capabilities. Understanding this precision requirement is
+crucial for both software optimization and hardware design, as it directly
+influences decisions about arithmetic unit complexity, memory hierarchy
+organization, and data movement strategies in domain-specific accelerators.
+
+This work presents a comprehensive study examining the relationship between
+quantization bit depth and model performance across diverse neural network
+architectures. Through implementation of a custom quantization framework that
+enables exploration of arbitrary bit depths, the study evaluates four distinct
+neural architectures: a simple dense network, two different MNIST classifiers
+(dense and convolutional), and a transformer-based sequence model.
+
+In summary, my work contributes the following:
+\begin{enumerate}
+\item A flexible quantization framework for exploring arbitrary bit depths
+\item Empirical evaluation of quantization effects across multiple network architectures
+\item Analysis of the relationship between bit depth and model performance, introducing a ``signal-to-complexity'' metric
+\item Practical insights for informing both software quantization strategies and hardware design decisions
+\end{enumerate}
+
+% Your content sections go here
+
+\printbibliography
+
+\end{document}

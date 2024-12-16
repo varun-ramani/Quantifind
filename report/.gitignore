@@ -1,0 +1,6 @@
+*
+
+!*.tex
+!*.bib
+!*.py
+!.gitignore
