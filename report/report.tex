@@ -8,8 +8,8 @@
 % Bibliography file
 \addbibresource{references.bib}
 
-\title{Your Paper Title}
-\author{Your Name}
+\title{Quantifind: Finding Optimal Quantization Strategies For Diverse Neural Networks}
+\author{Varun Ramani}
 \date{\today}
 
 \begin{document}
@@ -82,7 +82,68 @@ In summary, my work contributes the following:
 \item Practical insights for informing both software quantization strategies and hardware design decisions
 \end{enumerate}
 
-% Your content sections go here
+\section{Related Work}
+The 1990's paper by \citeauthor{hammerstrom1990digital}
+\cite{hammerstrom1990digital} laid the foundation for modern quantization
+methods. Hammerstrom demonstrated that neural networks could operate effectively
+with simple digital arithmetic, including significantly reduced precision
+weights and activations. This early work in VLSI neural implementations
+established the fundamental viability of quantized neural computation, though
+the neural networks of that era were far simpler than today's deep
+architectures.
+
+The modern era of reduced precision neural networks, however, is defined by a
+seminal work by \citeauthor{gupta2015deep} \cite{gupta2015deep}, which
+demonstrated that deep neural networks could be effectively trained using 16-bit
+fixed-point arithmetic when employing stochastic rounding, achieving comparable
+performance to 32-bit floating-point computations. The work includes the
+implementation of an energy-efficient hardware accelerator that leverages
+low-precision fixed-point arithmetic with stochastic rounding.
+
+Building on this seminal work, the 2016 \citeauthor{hubara2016quantized} paper
+\cite{hubara2016quantized} introduces Quantized Neural Networks (QNNs), which
+constrain neural network weights and activations to low-precision values during
+both training and inference. The authors propose a training method that
+maintains these quantized values throughout the entire training process while
+keeping a high-precision version of the weights for gradient-based updates. The
+paper shows that QNNs can achieve near state-of-the-art results on several
+datasets including ImageNet.
+
+Google's 2017 work \cite{jouppi2017datacenter} prominently displayed
+quantization as a core design element of their Tensor Processing Unit.  The
+TPU's successful deployment of 8-bit quantization for large-scale production
+workloads provided concrete evidence that reduced precision arithmetic could
+deliver substantial performance and energy efficiency improvements in real-world
+applications. This hardware implementation helped establish 8-bit quantization
+as a de facto standard in many neural network accelerators.
+
+In 2018, NVIDIA's work on mixed precision approaches
+\cite{micikevicius2018mixed} showed that different parts of a neural network
+could operate at different numerical precisions without significant accuracy
+loss. Their work demonstrated that maintaining higher precision in critical
+operations while reducing precision elsewhere could optimize the
+accuracy-efficiency trade-off. This is invaluable for DSAs, wherein different
+computational units might support different levels of precision.
+
+The current state of quantization research was thoroughly summarized by
+\cite{gholami2021survey}, who reviewed various quantization methods for
+efficient neural network inference. Their work highlighted the diversity of
+approaches to quantization and the need for systematic evaluation of these
+methods across different neural architectures. 
+
+To summarize, although the prior work thoroughly addresses different
+quantization approaches and implementations, the study in
+\cite{gholami2021survey} clearly illustrates that two questions remain unanswered:
+\begin{enumerate}
+    \item What level of precision should a deep learning practitioner quantize
+    to for the purposes of balancing efficiency and performance?
+    \item How do different neural network architectures compare in their
+    response to quantization?
+\end{enumerate}
+
+My study will attempt to answer both these questions, and in doing so, hopefully
+lay a foundation for implementing more efficient quantized hardware accelerators
+for neural networks.
 
 \printbibliography
 
