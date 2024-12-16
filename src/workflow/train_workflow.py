@@ -82,7 +82,7 @@ def save_train_context(
     """
     checkpoints_dir = Path(checkpoints_dir)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    checkpoint_filename = f'checkpoint_step1_{timestamp}.pth'
+    checkpoint_filename = f'checkpoint_{timestamp}.pth'
     checkpoint_path = checkpoints_dir / checkpoint_filename
     torch.save({
         'model_state_dict': net.state_dict(),
@@ -90,3 +90,32 @@ def save_train_context(
         'loss': loss,
     }, checkpoint_path)
     utils.log_info(f"Saved '{checkpoint_path}' with loss {loss}")
+
+
+def load_train_context(
+    checkpoints_dir: str,
+    net: torch.nn.Module,
+    optimizer: torch.optim.Optimizer
+) -> None:
+    """
+    Loads the latest checkpoint from checkpoints_dir into the provided net and optimizer.
+
+    Args:
+        checkpoints_dir: directory containing checkpoints
+        net: model to load state into
+        optimizer: optimizer to load state into
+    """
+    checkpoints_dir = Path(checkpoints_dir)
+    checkpoint_files = list(checkpoints_dir.glob('checkpoint_*.pth'))
+    
+    if not checkpoint_files:
+        utils.log_info(f"No checkpoints found in {checkpoints_dir}")
+        return
+        
+    latest_checkpoint = max(checkpoint_files, key=lambda p: p.stat().st_mtime)
+    checkpoint = torch.load(latest_checkpoint)
+    
+    net.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    
+    utils.log_info(f"Loaded latest checkpoint '{latest_checkpoint}'")
