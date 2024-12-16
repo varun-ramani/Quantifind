@@ -87,7 +87,6 @@ def evaluate_quantized_model(
     # Create quantizer and quantize model/data
     quantizer = BitQuantizer(bit_depth)
     quantized_model = quantizer.quantized_model(model)
-    quantized_loader = quantizer.quantized_dataloader(test_loader)
 
     # Compute losses
     original_loss = compute_test_loss(
@@ -99,7 +98,7 @@ def evaluate_quantized_model(
     )
     quantized_loss = compute_test_loss(
         quantized_model,
-        quantized_loader,
+        test_loader,
         loss_fn,
         taskname=(f"Compute {bit_depth}-bit test loss"),
         progress=progress,
@@ -110,10 +109,10 @@ def evaluate_quantized_model(
 
     return {
         "bit_depth": bit_depth,
-        "original_loss": original_loss,
-        "quantized_loss": quantized_loss,
-        "normalized_loss": quantized_loss / bit_depth,
-        "loss_ratio": quantized_loss / original_loss,
+        "original_crit": original_loss,
+        "quantized_crit": quantized_loss,
+        "sig_to_complex": quantized_loss / bit_depth,
+        "crit_ratio": quantized_loss / original_loss,
     }
 
 
