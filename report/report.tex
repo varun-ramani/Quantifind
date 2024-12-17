@@ -347,9 +347,208 @@ These metrics were chosen to provide complementary views of quantization
 effects: while CR measures relative change in the optimization criterion, SCR
 provides insight into the efficiency of bit utilization.
 
+\section{Results}
+Analysis of quantization effects across the four architectures revealed several
+key patterns in how different neural network designs respond to reduced
+precision. Please look through the actual result figures, provided in Appendix D.
 
+\subsection{Simple Dense Network}
+The simple dense network exhibited a distinct quantization response
+characterized by a sharp performance cliff below 4 bits, followed by rapid
+stabilization. The criterion ratio shows that with 4-bit quantization, the loss
+increased by approximately 10\% compared to the 32-bit baseline. Further
+precision reduction to 3 bits resulted in a 20\% loss increase, while 2-bit
+quantization led to a 60\% degradation. Notably, performance remained virtually
+identical to the baseline for all bit depths above 4 bits, suggesting this
+architecture has minimal high-precision requirements.
 
+\subsection{Dense vs. Convolutional MNIST}
+Comparing the MNIST classifiers reveals an important architectural effect. The
+dense network showed higher sensitivity to extreme quantization, with its
+criterion ratio reaching 1.4 at 2 bits compared to 1.2 for the convolutional
+network. This suggests that spatial operations in CNNs may provide some inherent
+robustness to quantization effects. Moreover, both networks showed minimal
+performance impact (less than 1\% loss increase) above 5 bits, indicating that
+standard 8-bit quantization provides considerable headroom for these tasks.
+
+\subsection{Language Transformer}
+The transformer architecture demonstrated markedly different behavior from the
+feed-forward networks. Its criterion ratio exhibited the sharpest initial
+degradation, jumping to nearly 1.8 at 3 bits - significantly higher than any
+other tested architecture. However, the transformer also showed the fastest
+stabilization, with performance nearly matching the baseline above 6 bits. This
+suggests that while transformers require higher minimum precision than simpler
+architectures, they may not benefit substantially from precisions above 8 bits.
+
+\subsection{Signal-to-Complexity Analysis}
+The signal-to-complexity ratio (SCR) revealed optimal bit depths for each
+architecture. All networks showed rapidly diminishing returns in SCR above 8
+bits, with the steepest efficiency gains occurring between 3-8 bits. The
+transformer achieved its optimal SCR at 7 bits, while both MNIST networks peaked
+at 6 bits, and the simple dense network at 5 bits. This suggests that commonly
+used 8-bit quantization may be unnecessarily precise for simpler architectures.
+
+\subsection{Cross-Architecture Patterns}
+Several consistent patterns emerged across all architectures:
+\begin{itemize}
+\item Performance cliffs consistently appeared below 4 bits, suggesting this may
+represent a fundamental lower bound for useful neural computation
+\item Minimal benefits were observed above 8 bits, questioning the value of
+higher precisions
+\item Architecture complexity correlates with minimum precision requirements but
+not with optimal bit depth
+\item All networks showed remarkable resilience to moderate precision reduction,
+maintaining near-baseline performance with 8-bit quantization
+\end{itemize}
+These findings suggest that hardware accelerator designs should focus on
+efficient implementation of 4-8 bit operations, as this range captures the
+optimal precision for most architectures while maintaining close to
+full-precision performance.
 
 \printbibliography
+
+\appendix
+\section{Problems I Faced}
+I encountered a few technical challenges worth mentioning during this study:
+
+\subsection{Hardware and Training Issues}
+Initial attempts to train the language model proved intractable due to CUDA
+memory management and data loading bottlenecks. This was resolved by
+restructuring the data loading pipeline to transfer data directly to GPU memory
+before use, significantly reducing transfer overhead. However, this solution
+required careful memory management to prevent GPU memory exhaustion.
+\subsection{Quantization Implementation}
+PyTorch's lack of native support for arbitrary-precision float quantization
+presented a significant challenge. While PyTorch provides tools for standard
+8-bit quantization, exploring the full range of bit depths required a custom
+implementation. The discretization strategy implemented in this work, while
+somewhat unconventional, provided a practical workaround by simulating
+fixed-point arithmetic within floating-point operations.
+\subsection{Dataset Quantization}
+An unexpected challenge arose in quantizing input data efficiently. The naive
+approach of quantizing each batch during training created a significant
+computational overhead. This was resolved by implementing a custom Dataset
+wrapper that pre-quantizes data while maintaining the ability to modify
+quantization parameters between epochs.
+
+\section{Optimizations I Made}
+Several key optimizations were implemented to make the evaluation of multiple
+quantization levels computationally tractable:
+\subsection{GPU Acceleration}
+The evaluation framework leverages GPU acceleration throughout the pipeline:
+\begin{itemize}
+\item Models and data are transferred to GPU memory once and kept there during
+evaluation
+\item Quantization operations are performed directly on GPU tensors, avoiding
+CPU-GPU transfers
+\item The custom Dataset wrapper was modified to load data directly to GPU
+memory, eliminating transfer overhead during training
+\end{itemize}
+\subsection{Parallel Evaluation}
+The evaluation of different bit depths was parallelized using Python's
+ThreadPoolExecutor:
+\begin{itemize}
+\item Independent worker threads evaluate different bit depths simultaneously
+\item A maximum of 4 workers operate concurrently to avoid GPU memory saturation
+\item Results are collected asynchronously as they complete
+\end{itemize}
+\subsection{Caching Strategy}
+To avoid redundant computations, the framework implements result caching:
+\begin{itemize}
+\item Loss values for the 32-bit baseline model are computed once and cached
+\item Test results for each bit depth are stored and reused when needed
+\item Cache keys are based on model/data combinations to ensure correctness
+\end{itemize}
+\subsection{Memory Management}
+Several optimizations were implemented to manage memory efficiency:
+\begin{itemize}
+\item Quantized models are created and destroyed sequentially rather than stored
+\item Intermediate tensors are explicitly freed after use and result tensors are
+explicitly detached from the PyTorch computation graph.
+\end{itemize}
+
+\section{GitHub Repository}
+The code for this project can be found at \href{https://github.com/varun-ramani/Quantifind}{github.com/varun-ramani/Quantifind}.
+
+\clearpage
+\onecolumn
+
+\section{Figures}
+
+\label{appendix:figures}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/simple_dense_vis/crit_ratio.png}
+\caption{Criterion ratio across different bit depths for the single-layer dense network, showing the relationship between quantization precision and relative loss increase.}
+\label{fig:simple_dense_cr}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/simple_dense_vis/quantized_crit.png}
+\caption{Absolute quantized loss values at different bit depths for the single-layer dense network.}
+\label{fig:simple_dense_qc}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/simple_dense_vis/sig_to_complex.png}
+\caption{Signal-to-complexity ratio across bit depths for the single-layer dense network, measuring efficiency of bit utilization.}
+\label{fig:simple_dense_scr}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/dense_mnist_vis/crit_ratio.png}
+\caption{Criterion ratio across different bit depths for the three-layer dense MNIST classifier, showing quantization's impact on classification performance.}
+\label{fig:dense_mnist_cr}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/dense_mnist_vis/quantized_crit.png}
+\caption{Absolute cross-entropy loss values at different bit depths for the dense MNIST classifier.}
+\label{fig:dense_mnist_qc}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/dense_mnist_vis/sig_to_complex.png}
+\caption{Signal-to-complexity ratio across bit depths for the dense MNIST classifier.}
+\label{fig:dense_mnist_scr}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/conv_mnist_vis/crit_ratio.png}
+\caption{Criterion ratio across different bit depths for the convolutional MNIST classifier, demonstrating quantization effects on CNN performance.}
+\label{fig:conv_mnist_cr}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/conv_mnist_vis/quantized_crit.png}
+\caption{Absolute cross-entropy loss values at different bit depths for the convolutional MNIST classifier.}
+\label{fig:conv_mnist_qc}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/conv_mnist_vis/sig_to_complex.png}
+\caption{Signal-to-complexity ratio across bit depths for the convolutional MNIST classifier.}
+\label{fig:conv_mnist_scr}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/language_model_vis/crit_ratio.png}
+\caption{Criterion ratio across different bit depths for the language transformer model, showing quantization's impact on language identification performance.}
+\label{fig:lang_model_cr}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/language_model_vis/quantized_crit.png}
+\caption{Absolute cross-entropy loss values at different bit depths for the language transformer model.}
+\label{fig:lang_model_qc}
+\end{figure}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{vis/language_model_vis/sig_to_complex.png}
+\caption{Signal-to-complexity ratio across bit depths for the language transformer model.}
+\label{fig:lang_model_scr}
+\end{figure}
+
+
 
 \end{document}
